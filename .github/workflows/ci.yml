@@ -1,0 +1,42 @@
+name: CI Flask App  # Nom du workflow
+
+on:
+  push:
+    branches: [ main ]  # Déclenche sur push vers main
+  pull_request:
+    branches: [ main ]  # Ou sur PR
+
+jobs:
+  test:
+    runs-on: ubuntu-latest  # Runner Linux gratuit
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4  # Récupère ton code
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'  # Version Python
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt  # Installe Flask et pytest
+
+    - name: Lint with flake8  # Optionnel : Vérifie le style du code
+      run: |
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run tests
+      run: |
+        pytest test_app.py -v  # Lance tes tests
+
+    - name: Upload coverage (optionnel)
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-report
+        path: test-results.xml  # Si tu génères un rapport
