@@ -12,17 +12,30 @@ jobs:
       REPO: ${{ github.repository }}
       REF: ${{ github.ref }}
     steps:
+      - name: Debug HUB_WEBHOOK_URL
+        run: |
+          echo "HUB_WEBHOOK_URL='$HUB_WEBHOOK_URL'"
+          if [ -z "$HUB_WEBHOOK_URL" ]; then
+            echo "⚠️ HUB_WEBHOOK_URL is empty! Notifications won't be sent."
+          fi
+
       - name: Notify Workflow Start
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"workflow_start\",\"status\":\"started\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"workflow_start\",\"status\":\"started\"}"
+          else
+            echo "Skipping notification: HUB_WEBHOOK_URL empty"
+          fi
 
       - name: Checkout
         uses: actions/checkout@v4
       - name: Notify Step => Checkout
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Checkout\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Checkout\",\"status\":\"success\"}"
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,8 +43,10 @@ jobs:
           python-version: '3.12'
       - name: Notify Step => Setup Python
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Setup Python\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Setup Python\",\"status\":\"success\"}"
+          fi
 
       - name: Install Dependencies
         run: |
@@ -39,8 +54,10 @@ jobs:
           pip install -r requirements.txt
       - name: Notify Step => Install Dependencies
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Install Dependencies\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Install Dependencies\",\"status\":\"success\"}"
+          fi
 
       - name: Lint
         run: |
@@ -49,77 +66,25 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Notify Step => Lint
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Lint\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Lint\",\"status\":\"success\"}"
+          fi
 
       - name: Run Tests
         run: pytest test_app.py -v || true
       - name: Notify Step => Run Tests
         run: |
           STATUS=$([[ $? -eq 0 ]] && echo "success" || echo "failure")
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Run Tests\",\"status\":\"$STATUS\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"step\":\"Run Tests\",\"status\":\"$STATUS\"}"
+          fi
 
       - name: Notify Job Result
         run: |
           STATUS="${{ job.status }}"
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"status\":\"$STATUS\"}"
-
-  build-linux:
-    runs-on: ubuntu-latest
-    needs: test
-    env:
-      HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
-      REPO: ${{ github.repository }}
-      REF: ${{ github.ref }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Notify Step => Checkout
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"step\":\"Checkout\",\"status\":\"success\"}"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Notify Step => Setup Python
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"step\":\"Setup Python\",\"status\":\"success\"}"
-
-      - name: Install Dependencies & PyInstaller
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
-      - name: Notify Step => Install Dependencies
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"step\":\"Install Dependencies\",\"status\":\"success\"}"
-
-      - name: Build Linux Binary
-        run: pyinstaller --onefile app.py
-      - name: Notify Step => Build Linux Binary
-        run: |
-          STATUS=$([[ $? -eq 0 ]] && echo "success" || echo "failure")
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"step\":\"Build Linux Binary\",\"status\":\"$STATUS\"}"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: flask-app-linux
-          path: dist/app
-          retention-days: 7
-      - name: Notify Step => Upload Artifact
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"step\":\"Upload Artifact\",\"status\":\"success\"}"
-
-      - name: Notify Job Result
-        run: |
-          STATUS="${{ job.status }}"
-          curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
-          -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"build-linux\",\"status\":\"$STATUS\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -s -X POST "$HUB_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"repo\":\"$REPO\",\"ref\":\"$REF\",\"job\":\"test\",\"status\":\"$STATUS\"}"
+          fi
