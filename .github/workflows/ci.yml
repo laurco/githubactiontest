@@ -8,7 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
+      HUB_WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
       REPO: ${{ github.repository }}
       REF: ${{ github.ref }}
     steps:
