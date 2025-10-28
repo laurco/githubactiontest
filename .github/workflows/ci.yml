@@ -19,13 +19,13 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ env.REPO }}",
-              "ref": "${{ env.REF }}",
-              "job": "workflow",
-              "step": "start",
-              "status": "started"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "workflow" \
+              --arg step "start" \
+              --arg status "started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # === Job 1 : Checkout ===
   checkout:
@@ -49,26 +49,26 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ env.REPO }}",
-              "ref": "${{ env.REF }}",
-              "job": "checkout",
-              "step": "Checkout Code",
-              "status": "success"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "checkout" \
+              --arg step "Checkout Code" \
+              --arg status "success" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
       - name: Notify Failure
         if: failure() && env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ env.REPO }}",
-              "ref": "${{ env.REF }}",
-              "job": "checkout",
-              "step": "Checkout Code",
-              "status": "failure"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "checkout" \
+              --arg step "Checkout Code" \
+              --arg status "failure" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # === Job 2 : Setup Python ===
   setup-python:
@@ -85,26 +85,26 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "setup-python",
-              "step": "Setup Python",
-              "status": "success"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "setup-python" \
+              --arg step "Setup Python" \
+              --arg status "success" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
       - name: Notify Failure
         if: failure() && env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "setup-python",
-              "step": "Setup Python",
-              "status": "failure"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "setup-python" \
+              --arg step "Setup Python" \
+              --arg status "failure" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # === Job 3 : Install Dependencies ===
   install-deps:
@@ -124,26 +124,26 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "install-deps",
-              "step": "Install Dependencies",
-              "status": "success"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "install-deps" \
+              --arg step "Install Dependencies" \
+              --arg status "success" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
       - name: Notify Failure
         if: failure() && env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "install-deps",
-              "step": "Install Dependencies",
-              "status": "failure"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "install-deps" \
+              --arg step "Install Dependencies" \
+              --arg status "failure" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # === Job 4 : Lint ===
   lint:
@@ -166,26 +166,26 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "lint",
-              "step": "Lint",
-              "status": "success"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "lint" \
+              --arg step "Lint" \
+              --arg status "success" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
       - name: Notify Failure
         if: failure() && env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "lint",
-              "step": "Lint",
-              "status": "failure"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "lint" \
+              --arg step "Lint" \
+              --arg status "failure" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # === Job 5 : Test ===
   test:
@@ -197,7 +197,7 @@ jobs:
 
       - name: Run Tests
         id: run-tests
-        continue-on-error: true  # Pour capturer le status même si ça échoue
+        continue-on-error: true
         run: |
           pytest test_app.py -v
           echo "test_exit_code=$?" >> $GITHUB_OUTPUT
@@ -208,13 +208,13 @@ jobs:
           STATUS=$([[ "${{ steps.run-tests.outputs.test_exit_code }}" -eq 0 ]] && echo "success" || echo "failure")
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "test",
-              "step": "Run Tests",
-              "status": "'"$STATUS"'"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "test" \
+              --arg step "Run Tests" \
+              --arg status "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # == Notification finale du workflow ==
   notify-workflow-end:
@@ -236,10 +236,10 @@ jobs:
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repo": "${{ needs.checkout.outputs.repo }}",
-              "ref": "${{ needs.checkout.outputs.ref }}",
-              "job": "workflow",
-              "step": "end",
-              "status": "${{ steps.status.outputs.status }}"
-            }'
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "workflow" \
+              --arg step "end" \
+              --arg status "${{ steps.status.outputs.status }}" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
