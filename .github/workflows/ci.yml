@@ -216,7 +216,7 @@ jobs:
               "status": "'"$STATUS"'"
             }'
 
-  # === Notification finale du workflow ===
+  # == Notification finale du workflow ==
   notify-workflow-end:
     needs: [checkout, setup-python, install-deps, lint, test]
     runs-on: ubuntu-latest
