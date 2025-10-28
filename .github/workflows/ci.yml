@@ -14,7 +14,7 @@ jobs:
   notify-workflow-start:
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Start
+      - name: Notify Workflow Start
         if: env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
@@ -24,8 +24,8 @@ jobs:
               --arg ref "${{ env.REF }}" \
               --arg job "workflow" \
               --arg step "start" \
-              --arg status "started" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
 
   # === Job 1 : Checkout ===
   checkout:
@@ -35,6 +35,19 @@ jobs:
       repo: ${{ steps.set-outputs.outputs.repo }}
       ref: ${{ steps.set-outputs.outputs.ref }}
     steps:
+      - name: Notify Checkout Start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "checkout" \
+              --arg step "Checkout Code" \
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -44,9 +57,10 @@ jobs:
           echo "repo=${{ env.REPO }}" >> $GITHUB_OUTPUT
           echo "ref=${{ env.REF }}" >> $GITHUB_OUTPUT
 
-      - name: Notify Success
-        if: success() && env.HUB_WEBHOOK_URL != ''
+      - name: Notify Checkout End
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
+          STATUS=$([[ ${{ job.status }} == "success" ]] && echo "Successful" || echo "Failed")
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
@@ -54,35 +68,36 @@ jobs:
               --arg ref "${{ env.REF }}" \
               --arg job "checkout" \
               --arg step "Checkout Code" \
-              --arg status "success" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
-
-      - name: Notify Failure
-        if: failure() && env.HUB_WEBHOOK_URL != ''
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg job "checkout" \
-              --arg step "Checkout Code" \
-              --arg status "failure" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_end "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
 
   # === Job 2 : Setup Python ===
   setup-python:
     needs: checkout
     runs-on: ubuntu-latest
     steps:
+      - name: Notify Setup Python Start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "setup-python" \
+              --arg step "Setup Python" \
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Notify Success
-        if: success() && env.HUB_WEBHOOK_URL != ''
+      - name: Notify Setup Python End
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
+          STATUS=$([[ ${{ job.status }} == "success" ]] && echo "Successful" || echo "Failed")
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
@@ -90,27 +105,27 @@ jobs:
               --arg ref "${{ needs.checkout.outputs.ref }}" \
               --arg job "setup-python" \
               --arg step "Setup Python" \
-              --arg status "success" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
-
-      - name: Notify Failure
-        if: failure() && env.HUB_WEBHOOK_URL != ''
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ needs.checkout.outputs.repo }}" \
-              --arg ref "${{ needs.checkout.outputs.ref }}" \
-              --arg job "setup-python" \
-              --arg step "Setup Python" \
-              --arg status "failure" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_end "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
 
   # === Job 3 : Install Dependencies ===
   install-deps:
     needs: setup-python
     runs-on: ubuntu-latest
     steps:
+      - name: Notify Install Deps Start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "install-deps" \
+              --arg step "Install Dependencies" \
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -119,9 +134,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Notify Success
-        if: success() && env.HUB_WEBHOOK_URL != ''
+      - name: Notify Install Deps End
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
+          STATUS=$([[ ${{ job.status }} == "success" ]] && echo "Successful" || echo "Failed")
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
@@ -129,27 +145,27 @@ jobs:
               --arg ref "${{ needs.checkout.outputs.ref }}" \
               --arg job "install-deps" \
               --arg step "Install Dependencies" \
-              --arg status "success" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
-
-      - name: Notify Failure
-        if: failure() && env.HUB_WEBHOOK_URL != ''
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ needs.checkout.outputs.repo }}" \
-              --arg ref "${{ needs.checkout.outputs.ref }}" \
-              --arg job "install-deps" \
-              --arg step "Install Dependencies" \
-              --arg status "failure" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_end "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
 
   # === Job 4 : Lint ===
   lint:
     needs: install-deps
     runs-on: ubuntu-latest
     steps:
+      - name: Notify Lint Start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "lint" \
+              --arg step "Lint" \
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -161,9 +177,10 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Notify Success
-        if: success() && env.HUB_WEBHOOK_URL != ''
+      - name: Notify Lint End
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
+          STATUS=$([[ ${{ job.status }} == "success" ]] && echo "Successful" || echo "Failed")
           curl -s -X POST "$HUB_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
@@ -171,52 +188,52 @@ jobs:
               --arg ref "${{ needs.checkout.outputs.ref }}" \
               --arg job "lint" \
               --arg step "Lint" \
-              --arg status "success" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
-
-      - name: Notify Failure
-        if: failure() && env.HUB_WEBHOOK_URL != ''
-        run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ needs.checkout.outputs.repo }}" \
-              --arg ref "${{ needs.checkout.outputs.ref }}" \
-              --arg job "lint" \
-              --arg step "Lint" \
-              --arg status "failure" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_end "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
 
   # === Job 5 : Test ===
   test:
-  needs: lint
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Test Start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "test" \
+              --arg step "Run Tests" \
+              --arg status_start "Started" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_start:$status_start}')"
 
-    - name: Run Tests
-      id: run-tests
-      continue-on-error: true
-      run: |
-        pytest test_app.py -v
-        echo "test_exit_code=$?" >> $GITHUB_OUTPUT
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Notify Test Result
-      if: env.HUB_WEBHOOK_URL != ''
-      run: |
-        STATUS=$([[ "${{ steps.run-tests.outputs.test_exit_code }}" -eq 0 ]] && echo "Successful" || echo "Failed")
-        curl -s -X POST "$HUB_WEBHOOK_URL" \
-          -H "Content-Type: application/json" \
-          -d "$(jq -n \
-            --arg repo "${{ needs.checkout.outputs.repo }}" \
-            --arg ref "${{ needs.checkout.outputs.ref }}" \
-            --arg job "test" \
-            --arg step "Run Tests" \
-            --arg status "$STATUS" \
-            '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+      - name: Run Tests
+        id: run-tests
+        continue-on-error: true
+        run: |
+          pytest test_app.py -v
+          echo "test_exit_code=$?" >> $GITHUB_OUTPUT
 
-  # == Notification finale du workflow ==
+      - name: Notify Test End
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          STATUS=$([[ "${{ steps.run-tests.outputs.test_exit_code }}" -eq 0 ]] && echo "Successful" || echo "Failed")
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ needs.checkout.outputs.repo }}" \
+              --arg ref "${{ needs.checkout.outputs.ref }}" \
+              --arg job "test" \
+              --arg step "Run Tests" \
+              --arg status_end "$STATUS" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
+
+  # === Notification finale du workflow ===
   notify-workflow-end:
     needs: [checkout, setup-python, install-deps, lint, test]
     runs-on: ubuntu-latest
@@ -228,7 +245,7 @@ jobs:
           TEST_STATUS=$([[ "${{ needs.test.result }}" == "success" ]] && echo "Successful" || echo "Failed")
           echo "status=$TEST_STATUS" >> $GITHUB_OUTPUT
 
-      - name: Notify End
+      - name: Notify Workflow End
         if: env.HUB_WEBHOOK_URL != ''
         run: |
           curl -s -X POST "$HUB_WEBHOOK_URL" \
@@ -238,5 +255,5 @@ jobs:
               --arg ref "${{ needs.checkout.outputs.ref }}" \
               --arg job "workflow" \
               --arg step "end" \
-              --arg status "${{ steps.status.outputs.status }}" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+              --arg status_end "${{ steps.status.outputs.status }}" \
+              '{repo:$repo, ref:$ref, job:$job, step:$step, status_end:$status_end}')"
