@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Notify Step Result: Checkout code
+      - name: Notify Step Result => Checkout code
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
           curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
@@ -41,7 +41,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Notify Step Result: Set up Python
+      - name: Notify Step Result=> Set up Python
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
           curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
@@ -52,7 +52,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Notify Step Result: Install dependencies
+      - name: Notify Step Result=> Install dependencies
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
           curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
@@ -64,7 +64,7 @@ jobs:
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      - name: Notify Step Result: Lint
+      - name: Notify Step Result=> Lint
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
           curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
@@ -74,7 +74,7 @@ jobs:
       - name: Run tests
         run: pytest test_app.py -v
         continue-on-error: true
-      - name: Notify Step Result: Run tests
+      - name: Notify Step Result=> Run tests
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
           STATUS=$([[ $? -eq 0 ]] && echo "success" || echo "failure")
@@ -99,7 +99,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Notify Step Result: Checkout code
+      - name: Notify Step Result=> Checkout code
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
@@ -110,7 +110,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Notify Step Result: Set up Python
+      - name: Notify Step Result=> Set up Python
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
@@ -122,7 +122,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-      - name: Notify Step Result: Install dependencies
+      - name: Notify Step Result=> Install dependencies
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
@@ -131,7 +131,7 @@ jobs:
 
       - name: Build executable
         run: pyinstaller --onefile app.py
-      - name: Notify Step Result: Build executable
+      - name: Notify Step Result=> Build executable
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
@@ -144,7 +144,7 @@ jobs:
           name: flask-app-exe
           path: dist/app.exe
           retention-days: 7
-      - name: Notify Step Result: Upload executable
+      - name: Notify Step Result=> Upload executable
         if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
