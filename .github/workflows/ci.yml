@@ -73,6 +73,14 @@ jobs:
 
       - name: Notify Hub (Build Job)
         if: always()
-        run: curl -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" -H "Content-Type: application/json" -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"status\":\"${{ job.status }}\",\"job\":\"build-exe\"}"
+        shell: pwsh
+        run: |
+          $payload = @{
+            repo = "${GITHUB_REPOSITORY}"
+            ref  = "${GITHUB_REF}"
+            status = "${{ job.status }}"
+            job = "build-exe"
+          } | ConvertTo-Json
+          Invoke-RestMethod -Uri "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" -Method Post -Body $payload -ContentType "application/json"
         env:
           WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
