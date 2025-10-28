@@ -73,9 +73,6 @@ jobs:
 
       - name: Notify Hub (Build Job)
         if: always()
-        run: |
-          curl -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"status\":\"${{ job.status }}\",\"job\":\"build-exe\"}"
+        run: curl -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" -H "Content-Type: application/json" -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"status\":\"${{ job.status }}\",\"job\":\"build-exe\"}"
         env:
           WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
