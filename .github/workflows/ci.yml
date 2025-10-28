@@ -13,13 +13,16 @@ jobs:
   # =============================
   notify-structure:
     runs-on: ubuntu-latest
-    if: ${{ secrets.HUB_WEBHOOK_URL }}
     steps:
       - name: Notify Hub Workflow Structure
         run: |
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"jobs\":[{\"name\":\"test\",\"steps\":[\"Checkout code\",\"Set up Python\",\"Install dependencies\",\"Lint\",\"Run tests\"]},{\"name\":\"build-exe\",\"steps\":[\"Checkout code\",\"Set up Python\",\"Install dependencies\",\"Build executable\",\"Upload executable\"]}]}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"jobs\":[{\"name\":\"test\",\"steps\":[\"Checkout code\",\"Set up Python\",\"Install dependencies\",\"Lint\",\"Run tests\"]},{\"name\":\"build-exe\",\"steps\":[\"Checkout code\",\"Set up Python\",\"Install dependencies\",\"Build executable\",\"Upload executable\"]}]}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
   # =============================
   # Job 1: Test
@@ -30,34 +33,43 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Notify Step Result => Checkout code
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
+      - name: Notify Step Result=> Checkout code
         run: |
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"step\":\"Checkout code\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"step\":\"Checkout code\",\"status\":\"success\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Notify Step Result=> Set up Python
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"step\":\"Set up Python\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"step\":\"Set up Python\",\"status\":\"success\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Notify Step Result=> Install dependencies
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"step\":\"Install dependencies\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"step\":\"Install dependencies\",\"status\":\"success\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Lint with flake8
         run: |
@@ -65,30 +77,39 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Notify Step Result=> Lint
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"step\":\"Lint\",\"status\":\"success\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"step\":\"Lint\",\"status\":\"success\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Run tests
         run: pytest test_app.py -v
         continue-on-error: true
       - name: Notify Step Result=> Run tests
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
-          STATUS=$([[ $? -eq 0 ]] && echo "success" || echo "failure")
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"step\":\"Run tests\",\"status\":\"$STATUS\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            STATUS=$([[ $? -eq 0 ]] && echo "success" || echo "failure")
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"step\":\"Run tests\",\"status\":\"$STATUS\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Notify Job Result
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         run: |
-          STATUS="${{ job.status }}"
-          curl -X POST "${{ secrets.HUB_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"repo\":\"${{ github.repository }}\",\"ref\":\"${{ github.ref }}\",\"job\":\"test\",\"status\":\"$STATUS\"}"
+          if [ -n "$HUB_WEBHOOK_URL" ]; then
+            STATUS="${{ job.status }}"
+            curl -X POST "$HUB_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"job\":\"test\",\"status\":\"$STATUS\"}"
+          fi
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
   # =============================
   # Job 2: Build executable
@@ -100,22 +121,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Notify Step Result=> Checkout code
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; step="Checkout code"; status="success" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; step="Checkout code"; status="success" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Notify Step Result=> Set up Python
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; step="Set up Python"; status="success" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; step="Set up Python"; status="success" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Install dependencies
         run: |
@@ -123,20 +150,26 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
       - name: Notify Step Result=> Install dependencies
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; step="Install dependencies"; status="success" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; step="Install dependencies"; status="success" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Build executable
         run: pyinstaller --onefile app.py
       - name: Notify Step Result=> Build executable
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; step="Build executable"; status="success" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; step="Build executable"; status="success" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
@@ -145,15 +178,21 @@ jobs:
           path: dist/app.exe
           retention-days: 7
       - name: Notify Step Result=> Upload executable
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; step="Upload executable"; status="success" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; step="Upload executable"; status="success" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
 
       - name: Notify Job Result
-        if: ${{ secrets.HUB_WEBHOOK_URL }}
         shell: pwsh
         run: |
-          $payload = @{ repo="${{ github.repository }}"; ref="${{ github.ref }}"; job="build-exe"; status="${{ job.status }}" } | ConvertTo-Json
-          Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          if ($env:HUB_WEBHOOK_URL) {
+            $payload = @{ repo="${GITHUB_REPOSITORY}"; ref="${GITHUB_REF}"; job="build-exe"; status="${{ job.status }}" } | ConvertTo-Json
+            Invoke-RestMethod -Uri $env:HUB_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+          }
+        env:
+          HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
