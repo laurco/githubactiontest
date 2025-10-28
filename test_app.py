@@ -1,6 +1,7 @@
 import pytest
 from app import app
 
+
 @pytest.fixture
 def client():
     app.config['TESTING'] = True
@@ -11,7 +12,7 @@ def test_hello(client):
     rv = client.get('/')
     assert rv.status_code == 200
     assert b'Hello, Flask' in rv.data
-    
+
 
 def test_health(client):
     rv = client.get('/health')
