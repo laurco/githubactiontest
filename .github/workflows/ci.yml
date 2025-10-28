@@ -189,32 +189,32 @@ jobs:
 
   # === Job 5 : Test ===
   test:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+  needs: lint
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Run Tests
-        id: run-tests
-        continue-on-error: true
-        run: |
-          pytest test_app.py -v
-          echo "test_exit_code=$?" >> $GITHUB_OUTPUT
+    - name: Run Tests
+      id: run-tests
+      continue-on-error: true
+      run: |
+        pytest test_app.py -v
+        echo "test_exit_code=$?" >> $GITHUB_OUTPUT
 
-      - name: Notify Test Result
-        if: env.HUB_WEBHOOK_URL != ''
-        run: |
-          STATUS=$([[ "${{ steps.run-tests.outputs.test_exit_code }}" -eq 0 ]] && echo "success" || echo "failure")
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ needs.checkout.outputs.repo }}" \
-              --arg ref "${{ needs.checkout.outputs.ref }}" \
-              --arg job "test" \
-              --arg step "Run Tests" \
-              --arg status "$STATUS" \
-              '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
+    - name: Notify Test Result
+      if: env.HUB_WEBHOOK_URL != ''
+      run: |
+        STATUS=$([[ "${{ steps.run-tests.outputs.test_exit_code }}" -eq 0 ]] && echo "Successful" || echo "Failed")
+        curl -s -X POST "$HUB_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$(jq -n \
+            --arg repo "${{ needs.checkout.outputs.repo }}" \
+            --arg ref "${{ needs.checkout.outputs.ref }}" \
+            --arg job "test" \
+            --arg step "Run Tests" \
+            --arg status "$STATUS" \
+            '{repo:$repo, ref:$ref, job:$job, step:$step, status:$status}')"
 
   # == Notification finale du workflow ==
   notify-workflow-end:
@@ -225,12 +225,8 @@ jobs:
       - name: Determine Final Status
         id: status
         run: |
-          if [[ "${{ needs.test.result }}" == "success" ]]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          else
-            echo "status=failure" >> $GITHUB_OUTPUT
-          fi
-
+          TEST_STATUS=$([[ "${{ needs.test.result }}" == "success" ]] && echo "Successful" || echo "Failed")
+          echo "status=$TEST_STATUS" >> $GITHUB_OUTPUT
 
       - name: Notify End
         if: env.HUB_WEBHOOK_URL != ''
