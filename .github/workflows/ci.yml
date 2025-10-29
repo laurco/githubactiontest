@@ -24,20 +24,21 @@ jobs:
           echo "Webhook URL is set? ${{ env.HUB_WEBHOOK_URL != '' }}"
           echo "::endgroup::"
 
-        - name: Get start timestamp
-          id: timestamp
-          run: echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+      - name: Get start timestamp
+        id: timestamp
+        run: |
+          echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-        - name: Notify pipeline start
-          if: env.HUB_WEBHOOK_URL != ''
-          run: |
-            curl -s -X POST "$HUB_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              -d "$(jq -n \
-                --arg repo "${{ env.REPO }}" \
-                --arg ref "${{ env.REF }}" \
-                --arg date "${{ steps.timestamp.outputs.time }}" \
-                '{type:"start", repo:$repo, branch:$ref, start_time:$date}')"
+      - name: Notify pipeline start
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          curl -s -X POST "$HUB_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg date "${{ steps.timestamp.outputs.time }}" \
+              '{type:"start", repo:$repo, branch:$ref, start_time:$date}')"
 
   main:
     needs: start-notify
