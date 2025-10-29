@@ -7,8 +7,8 @@ on:
 env:
   REPO: ${{ github.repository }}
   REF: ${{ github.ref }}
-  # URL hardcodée (comme tu veux)
   WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
+  NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}  # ← Ton secret ngrok
 
 jobs:
   # === 1. Notification de démarrage ===
@@ -24,6 +24,7 @@ jobs:
           echo "REF=${{ env.REF }}"
           echo "RUN_ID=${{ github.run_id }}"
           echo "WEBHOOK_URL=$WEBHOOK_URL"
+          echo "NGROK_SECRET set? ${{ env.NGROK_SECRET != '' }}"
           echo "::endgroup::"
 
       - name: Get start timestamp
@@ -31,26 +32,13 @@ jobs:
         run: |
           echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Notify pipeline start (DEBUG)
+      - name: Notify pipeline start
+        env:
+          TYPE: start
+          STEP: ""
+          EXTRA: '{"start_time": "${{ steps.timestamp.outputs.time }}"}'
         run: |
-          echo "Sending START notification..."
-          echo "URL: $WEBHOOK_URL"
-          echo "Payload:"
-          jq -n \
-            --arg repo "${{ env.REPO }}" \
-            --arg ref "${{ env.REF }}" \
-            --arg date "${{ steps.timestamp.outputs.time }}" \
-            '{type:"start", repo:$repo, branch:$ref, start_time:$date}'
-
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg date "${{ steps.timestamp.outputs.time }}" \
-              '{type:"start", repo:$repo, branch:$ref, start_time:$date}')" \
-            || echo "curl failed (but continuing)"
+          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
 
   # === 2. Job principal ===
   main:
@@ -64,19 +52,12 @@ jobs:
         run: |
           pip install --upgrade pip
 
-      - name: Notify Step Start - Setup Python (DEBUG)
+      - name: Notify Step Start - Setup Python
+        env:
+          TYPE: step_start
+          STEP: Setup Python
         run: |
-          echo "Sending STEP START: Setup Python"
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg job "main" \
-              --arg step "Setup Python" \
-              '{type:"step_start", repo:$repo, branch:$ref, job:$job, step:$step}')" \
-            || echo "curl failed"
+          . .github/scripts/notify.sh "$TYPE" "$STEP"
 
       - name: Install deps
         id: install
@@ -84,21 +65,13 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Notify Step End - Install deps (DEBUG)
+      - name: Notify Step End - Install deps
+        env:
+          TYPE: step_end
+          STEP: Install deps
+          STATUS: ${{ steps.install.outcome == 'success' && 'Successful' || 'Failed' }}
         run: |
-          STATUS=$([ "${{ steps.install.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
-          echo "Sending STEP END: Install deps → $STATUS"
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg job "main" \
-              --arg step "Install deps" \
-              --arg status_end "$STATUS" \
-              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')" \
-            || echo "curl failed"
+          . .github/scripts/notify.sh "$TYPE" "$STEP" "$STATUS"
 
       - name: Run tests
         id: tests
@@ -106,21 +79,13 @@ jobs:
         run: |
           pytest test_app.py -v
 
-      - name: Notify Step End - Run tests (DEBUG)
+      - name: Notify Step End - Run tests
+        env:
+          TYPE: step_end
+          STEP: Run tests
+          STATUS: ${{ steps.tests.outcome == 'success' && 'Successful' || 'Failed' }}
         run: |
-          STATUS=$([ "${{ steps.tests.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
-          echo "Sending STEP END: Run tests → $STATUS"
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg job "main" \
-              --arg step "Run tests" \
-              --arg status_end "$STATUS" \
-              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')" \
-            || echo "curl failed"
+          . .github/scripts/notify.sh "$TYPE" "$STEP" "$STATUS"
 
       - name: Archive results
         run: |
@@ -138,19 +103,13 @@ jobs:
     needs: [start-notify, main]
     runs-on: ubuntu-latest
     steps:
-      - name: Notify failure (DEBUG)
+      - name: Notify failure
+        env:
+          TYPE: fail
+          STEP: ${{ github.job }}
+          EXTRA: '{"fail_time": "$(date -u \"+%Y-%m-%d %H:%M:%S UTC\")"}'
         run: |
-          echo "Sending FAILURE notification"
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg date "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
-              --arg step "${{ github.job }}" \
-              '{type:"fail", repo:$repo, branch:$ref, failed_step:$step, fail_time:$date}')" \
-            || echo "curl failed"
+          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
 
   # === 4. Fin ===
   end-notify:
@@ -163,19 +122,11 @@ jobs:
         run: |
           echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Notify pipeline end (DEBUG)
+      - name: Notify pipeline end
+        env:
+          TYPE: end
+          STEP: ""
+          STATUS: ${{ needs.main.result == 'success' && 'Successful' || 'Failed' }}
+          EXTRA: '{"end_time": "${{ steps.timestamp.outputs.time }}", "artifact_url": "https://github.com/${{ env.REPO }}/actions/runs/${{ github.run_id }}", "status": "'$STATUS'"}'
         run: |
-          ARTIFACT_URL="https://github.com/${{ env.REPO }}/actions/runs/${{ github.run_id }}"
-          STATUS=$([ "${{ needs.main.result }}" = "success" ] && echo "Successful" || echo "Failed")
-          echo "Sending END notification → $STATUS"
-          curl -v \
-            -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg repo "${{ env.REPO }}" \
-              --arg ref "${{ env.REF }}" \
-              --arg date "${{ steps.timestamp.outputs.time }}" \
-              --arg url "$ARTIFACT_URL" \
-              --arg status "$STATUS" \
-              '{type:"end", repo:$repo, branch:$ref, end_time:$date, artifact_url:$url, status:$status}')" \
-            || echo "curl failed"
+          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
