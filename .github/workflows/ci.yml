@@ -5,9 +5,10 @@ on:
     branches: [ main ]
 
 env:
-  HUB_WEBHOOK_URL: ${{ secrets.HUB_WEBHOOK_URL }}
   REPO: ${{ github.repository }}
   REF: ${{ github.ref }}
+  # URL hardcodée (comme tu veux)
+  WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
 
 jobs:
   # === 1. Notification de démarrage ===
@@ -22,7 +23,7 @@ jobs:
           echo "REPO=${{ env.REPO }}"
           echo "REF=${{ env.REF }}"
           echo "RUN_ID=${{ github.run_id }}"
-          echo "Webhook URL set? ${{ env.HUB_WEBHOOK_URL != '' }}"
+          echo "WEBHOOK_URL=$WEBHOOK_URL"
           echo "::endgroup::"
 
       - name: Get start timestamp
@@ -30,55 +31,65 @@ jobs:
         run: |
           echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Notify pipeline start
-        if: env.HUB_WEBHOOK_URL != ''
+      - name: Notify pipeline start (DEBUG)
         run: |
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending START notification..."
+          echo "URL: $WEBHOOK_URL"
+          echo "Payload:"
+          jq -n \
+            --arg repo "${{ env.REPO }}" \
+            --arg ref "${{ env.REF }}" \
+            --arg date "${{ steps.timestamp.outputs.time }}" \
+            '{type:"start", repo:$repo, branch:$ref, start_time:$date}'
+
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
               --arg ref "${{ env.REF }}" \
               --arg date "${{ steps.timestamp.outputs.time }}" \
-              '{type:"start", repo:$repo, branch:$ref, start_time:$date}')"
+              '{type:"start", repo:$repo, branch:$ref, start_time:$date}')" \
+            || echo "curl failed (but continuing)"
 
-  # === 2. Job principal : Build & Test ===
+  # === 2. Job principal ===
   main:
     needs: start-notify
     runs-on: ubuntu-latest
     steps:
-      # --- Checkout ---
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- Setup Python ---
       - name: Setup Python
         run: |
           pip install --upgrade pip
 
-      - name: Notify Step Start - Setup Python
-        if: env.HUB_WEBHOOK_URL != ''
+      - name: Notify Step Start - Setup Python (DEBUG)
         run: |
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending STEP START: Setup Python"
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
               --arg ref "${{ env.REF }}" \
               --arg job "main" \
               --arg step "Setup Python" \
-              '{type:"step_start", repo:$repo, branch:$ref, job:$job, step:$step}')"
+              '{type:"step_start", repo:$repo, branch:$ref, job:$job, step:$step}')" \
+            || echo "curl failed"
 
-      # --- Install Dependencies ---
       - name: Install deps
         id: install
         continue-on-error: true
         run: |
           pip install -r requirements.txt
 
-      - name: Notify Step End - Install deps
-        if: env.HUB_WEBHOOK_URL != ''
+      - name: Notify Step End - Install deps (DEBUG)
         run: |
           STATUS=$([ "${{ steps.install.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending STEP END: Install deps → $STATUS"
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
@@ -86,20 +97,21 @@ jobs:
               --arg job "main" \
               --arg step "Install deps" \
               --arg status_end "$STATUS" \
-              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')"
+              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')" \
+            || echo "curl failed"
 
-      # --- Run Tests ---
       - name: Run tests
         id: tests
         continue-on-error: true
         run: |
           pytest test_app.py -v
 
-      - name: Notify Step End - Run tests
-        if: env.HUB_WEBHOOK_URL != ''
+      - name: Notify Step End - Run tests (DEBUG)
         run: |
           STATUS=$([ "${{ steps.tests.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending STEP END: Run tests → $STATUS"
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
@@ -107,9 +119,9 @@ jobs:
               --arg job "main" \
               --arg step "Run tests" \
               --arg status_end "$STATUS" \
-              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')"
+              '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')" \
+            || echo "curl failed"
 
-      # --- Archive & Upload ---
       - name: Archive results
         run: |
           zip -r results.zip .
@@ -120,24 +132,27 @@ jobs:
           name: build-results
           path: results.zip
 
-  # === 3. Notification d'échec ===
+  # === 3. Échec ===
   fail-notify:
     if: failure()
     needs: [start-notify, main]
     runs-on: ubuntu-latest
     steps:
-      - name: Notify failure
+      - name: Notify failure (DEBUG)
         run: |
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending FAILURE notification"
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
               --arg ref "${{ env.REF }}" \
               --arg date "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
               --arg step "${{ github.job }}" \
-              '{type:"fail", repo:$repo, branch:$ref, failed_step:$step, fail_time:$date}')"
+              '{type:"fail", repo:$repo, branch:$ref, failed_step:$step, fail_time:$date}')" \
+            || echo "curl failed"
 
-  # === 4. Notification de fin (toujours exécutée) ===
+  # === 4. Fin ===
   end-notify:
     if: always()
     needs: [start-notify, main]
@@ -148,12 +163,13 @@ jobs:
         run: |
           echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Notify pipeline end
-        if: env.HUB_WEBHOOK_URL != ''
+      - name: Notify pipeline end (DEBUG)
         run: |
           ARTIFACT_URL="https://github.com/${{ env.REPO }}/actions/runs/${{ github.run_id }}"
           STATUS=$([ "${{ needs.main.result }}" = "success" ] && echo "Successful" || echo "Failed")
-          curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
+          echo "Sending END notification → $STATUS"
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg repo "${{ env.REPO }}" \
@@ -161,4 +177,5 @@ jobs:
               --arg date "${{ steps.timestamp.outputs.time }}" \
               --arg url "$ARTIFACT_URL" \
               --arg status "$STATUS" \
-              '{type:"end", repo:$repo, branch:$ref, end_time:$date, artifact_url:$url, status:$status}')"
+              '{type:"end", repo:$repo, branch:$ref, end_time:$date, artifact_url:$url, status:$status}')" \
+            || echo "curl failed"
