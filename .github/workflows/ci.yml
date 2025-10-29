@@ -10,6 +10,7 @@ env:
   REF: ${{ github.ref }}
 
 jobs:
+  # === 1. Notification de démarrage ===
   start-notify:
     runs-on: ubuntu-latest
     outputs:
@@ -18,15 +19,16 @@ jobs:
       - name: Log environment variables
         run: |
           echo "::group::[DEBUG] Environment variables"
-          echo "REPO=${{ github.repository }}"
-          echo "REF=${{ github.ref }}"
+          echo "REPO=${{ env.REPO }}"
+          echo "REF=${{ env.REF }}"
           echo "RUN_ID=${{ github.run_id }}"
           echo "Webhook URL set? ${{ env.HUB_WEBHOOK_URL != '' }}"
           echo "::endgroup::"
 
       - name: Get start timestamp
         id: timestamp
-        run: echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+        run: |
+          echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
       - name: Notify pipeline start
         if: env.HUB_WEBHOOK_URL != ''
@@ -39,53 +41,78 @@ jobs:
               --arg date "${{ steps.timestamp.outputs.time }}" \
               '{type:"start", repo:$repo, branch:$ref, start_time:$date}')"
 
+  # === 2. Job principal : Build & Test ===
   main:
     needs: start-notify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # --- Checkout ---
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      # --- Setup Python ---
       - name: Setup Python
         run: |
           pip install --upgrade pip
-        # Notify step start
-        env:
-          HUB_WEBHOOK_URL: ${{ env.HUB_WEBHOOK_URL }}
+
+      - name: Notify Step Start - Setup Python
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
-          STATUS="Started"
           curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
-              --arg job "main" --arg step "Setup Python" --arg status_start "$STATUS" \
-              '{type:"step_start", repo:$repo, branch:$ref, job:$job, step:$step, status_start:$status_start}')"
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "main" \
+              --arg step "Setup Python" \
+              '{type:"step_start", repo:$repo, branch:$ref, job:$job, step:$step}')"
 
+      # --- Install Dependencies ---
       - name: Install deps
+        id: install
+        continue-on-error: true
         run: |
           pip install -r requirements.txt
-        continue-on-error: true
-        env:
-          HUB_WEBHOOK_URL: ${{ env.HUB_WEBHOOK_URL }}
+
+      - name: Notify Step End - Install deps
+        if: env.HUB_WEBHOOK_URL != ''
         run: |
-          STATUS=$([[ $? -eq 0 ]] && echo "Successful" || echo "Failed")
+          STATUS=$([ "${{ steps.install.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
           curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
-              --arg job "main" --arg step "Install deps" --arg status_end "$STATUS" \
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "main" \
+              --arg step "Install deps" \
+              --arg status_end "$STATUS" \
               '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')"
 
+      # --- Run Tests ---
       - name: Run tests
+        id: tests
         continue-on-error: true
         run: |
           pytest test_app.py -v
-          STATUS=$([[ $? -eq 0 ]] && echo "Successful" || echo "Failed")
+
+      - name: Notify Step End - Run tests
+        if: env.HUB_WEBHOOK_URL != ''
+        run: |
+          STATUS=$([ "${{ steps.tests.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
           curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg repo "${{ env.REPO }}" --arg ref "${{ env.REF }}" \
-              --arg job "main" --arg step "Run tests" --arg status_end "$STATUS" \
+            -d "$(jq -n \
+              --arg repo "${{ env.REPO }}" \
+              --arg ref "${{ env.REF }}" \
+              --arg job "main" \
+              --arg step "Run tests" \
+              --arg status_end "$STATUS" \
               '{type:"step_end", repo:$repo, branch:$ref, job:$job, step:$step, status_end:$status_end}')"
 
+      # --- Archive & Upload ---
       - name: Archive results
-        run: zip -r results.zip .
+        run: |
+          zip -r results.zip .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -93,6 +120,7 @@ jobs:
           name: build-results
           path: results.zip
 
+  # === 3. Notification d'échec ===
   fail-notify:
     if: failure()
     needs: [start-notify, main]
@@ -109,6 +137,7 @@ jobs:
               --arg step "${{ github.job }}" \
               '{type:"fail", repo:$repo, branch:$ref, failed_step:$step, fail_time:$date}')"
 
+  # === 4. Notification de fin (toujours exécutée) ===
   end-notify:
     if: always()
     needs: [start-notify, main]
@@ -116,12 +145,14 @@ jobs:
     steps:
       - name: Get end timestamp
         id: timestamp
-        run: echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+        run: |
+          echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
       - name: Notify pipeline end
         if: env.HUB_WEBHOOK_URL != ''
         run: |
           ARTIFACT_URL="https://github.com/${{ env.REPO }}/actions/runs/${{ github.run_id }}"
+          STATUS=$([ "${{ needs.main.result }}" = "success" ] && echo "Successful" || echo "Failed")
           curl -s -X POST "https://karri-fruity-wrongfully.ngrok-free.dev/webhook" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
@@ -129,4 +160,5 @@ jobs:
               --arg ref "${{ env.REF }}" \
               --arg date "${{ steps.timestamp.outputs.time }}" \
               --arg url "$ARTIFACT_URL" \
-              '{type:"end", repo:$repo, branch:$ref, end_time:$date, artifact_url:$url}')"
+              --arg status "$STATUS" \
+              '{type:"end", repo:$repo, branch:$ref, end_time:$date, artifact_url:$url, status:$status}')"
