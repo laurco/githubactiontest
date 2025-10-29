@@ -15,6 +15,14 @@ jobs:
     outputs:
       start_time: ${{ steps.timestamp.outputs.time }}
     steps:
+      - name: Log environment variables
+        run: |
+          echo "::group::[DEBUG] Environment variables"
+          echo "HUB_WEBHOOK_URL=${{ env.HUB_WEBHOOK_URL }}"
+          echo "REPO=${{ env.REPO }}"
+          echo "REF=${{ env.REF }}"
+          echo "::endgroup::"
+
       - name: Get start timestamp
         id: timestamp
         run: echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
@@ -40,8 +48,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install deps
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
       - name: Run tests
         run: pytest test_app.py -v
       - name: Archive results
