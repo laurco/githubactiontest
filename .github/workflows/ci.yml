@@ -11,123 +11,122 @@ env:
   NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}
 
 jobs:
-  # === 1. Démarrage ===
-  start-notify:
-    runs-on: ubuntu-latest
-    outputs:
-      start_time: ${{ steps.timestamp.outputs.time }}
-    steps:
-      - name: Log env
-        run: |
-          echo "::group::[DEBUG]"
-          echo "REPO=$REPO"
-          echo "REF=$REF"
-          echo "WEBHOOK_URL=$WEBHOOK_URL"
-          echo "SECRET set? ${{ secrets.DEPLOY_ROBOT_SECRET != '' }}"
-          echo "::endgroup::"
-
-      - name: Get start timestamp
-        id: timestamp
-        run: |
-          echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
-
-      - name: Notify pipeline start
-        env:
-          TYPE: start
-          STEP: ""
-          EXTRA: '{"start_time": "${{ steps.timestamp.outputs.time }}"}'
-        run: |
-          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
-
-  # === 2. Main ===
-  main:
-    needs: start-notify
+  # === 1. Démarrage + Tests + Notifications (tout en un) ===
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Python
-        run: pip install --upgrade pip
-
-      - name: Notify Step Start - Setup Python
-        env:
-          TYPE: step_start
-          STEP: Setup Python
         run: |
-          . .github/scripts/notify.sh "$TYPE" "$STEP"
+          pip install --upgrade pip
 
-      - name: Install deps
+      # === NOTIFY START ===
+      - name: Notify Pipeline Start
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg time "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
+            '{type:"start", repo:$repo, branch:$ref, start_time:$time}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          echo "Sending START..."
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD" || echo "curl failed"
+
+      # === Step: Setup Python ===
+      - name: Notify Step Start - Setup Python
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg step "Setup Python" \
+            '{type:"step_start", repo:$repo, branch:$ref, job:"main", step:$step}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          curl -v -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD" || echo "curl failed"
+
+      # === Install deps ===
+      - name: Install Dependencies
         id: install
         continue-on-error: true
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
 
       - name: Notify Step End - Install deps
-        env:
-          TYPE: step_end
-          STEP: Install deps
-          STATUS: ${{ steps.install.outcome == 'success' && 'Successful' || 'Failed' }}
         run: |
-          . .github/scripts/notify.sh "$TYPE" "$STEP" "$STATUS"
+          STATUS=$([ "${{ steps.install.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg step "Install deps" \
+            --arg status "$STATUS" \
+            '{type:"step_end", repo:$repo, branch:$ref, job:"main", step:$step, status_end:$status}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          curl -v -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD" || echo "curl failed"
 
-      - name: Run tests
+      # === Run Tests ===
+      - name: Run Tests
         id: tests
         continue-on-error: true
-        run: pytest test_app.py -v
-
-      - name: Notify Step End - Run tests
-        env:
-          TYPE: step_end
-          STEP: Run tests
-          STATUS: ${{ steps.tests.outcome == 'success' && 'Successful' || 'Failed' }}
         run: |
-          . .github/scripts/notify.sh "$TYPE" "$STEP" "$STATUS"
+          pytest test_app.py -v
 
-      - name: Archive results
-        run: zip -r results.zip .
+      - name: Notify Step End - Run Tests
+        run: |
+          STATUS=$([ "${{ steps.tests.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg step "Run Tests" \
+            --arg status "$STATUS" \
+            '{type:"step_end", repo:$repo, branch:$ref, job:"main", step:$step, status_end:$status}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          curl -v -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD" || echo "curl failed"
 
-      - name: Upload artifact
+      # === Archive & Upload ===
+      - name: Archive Results
+        if: always()
+        run: |
+          zip -r results.zip .
+
+      - name: Upload Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-results
           path: results.zip
 
-  # === 3. Échec ===
-  fail-notify:
-    if: failure()
-    needs: [start-notify, main]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify failure
-        env:
-          TYPE: fail
-          STEP: ${{ github.job }}
-          EXTRA: '{"fail_time": "$(date -u \"+%Y-%m-%d %H:%M:%S UTC\")"}'
+      # === NOTIFY END (toujours exécuté) ===
+      - name: Notify Pipeline End
+        if: always()
         run: |
-          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
-
-  # === 4. Fin (CORRIGÉE !) ===
-  end-notify:
-    if: always()
-    needs: [start-notify, main]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get end timestamp
-        id: timestamp
-        run: |
-          echo "time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
-
-      - name: Notify pipeline end
-        env:
-          TYPE: end
-          STEP: ""
-          STATUS: ${{ needs.main.result == 'success' && 'Successful' || 'Failed' }}
-        run: |
-          # Construire EXTRA proprement
-          EXTRA=$(jq -n \
-            --arg et "${{ steps.timestamp.outputs.time }}" \
-            --arg url "https://github.com/$REPO/actions/runs/$RUN_ID" \
+          END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+          STATUS=$([ "${{ job.status }}" = "success" ] && echo "Successful" || echo "Failed")
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg time "$END_TIME" \
+            --arg url "$ARTIFACT_URL" \
             --arg status "$STATUS" \
-            '{end_time: $et, artifact_url: $url, status: $status}')
-
-          . .github/scripts/notify.sh "$TYPE" "$STEP" "$EXTRA"
+            '{type:"end", repo:$repo, branch:$ref, end_time:$time, artifact_url:$url, status:$status}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          echo "Sending END ($STATUS)..."
+          curl -v \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD" || echo "curl failed"
