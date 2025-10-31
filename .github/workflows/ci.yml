@@ -157,6 +157,20 @@ jobs:
           name: ci-results-${{ github.run_number }}
           path: ci-results-${{ github.run_number }}.zip
 
+      - name: DEBUG - Liste des artefacts (JSON)
+        run: |
+          echo "=== LISTE DES ARTEFACTS ==="
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" | jq .
+
+      - name: DEBUG - URL de téléchargement (JSON)
+        run: |
+          echo "=== URL DE TÉLÉCHARGEMENT ==="
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" | jq .
+
       - name: Get Artifact Download URL
         id: artifact
         env:
