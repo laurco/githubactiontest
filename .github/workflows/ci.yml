@@ -190,7 +190,7 @@ jobs:
 
       # === NOTIFY STEP END (avec URL API) ===
       - name: Notify Step End - Build Binary
-        if: always()
+        if: always() 
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
