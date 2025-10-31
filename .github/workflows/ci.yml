@@ -1,4 +1,4 @@
-name: CI Flask App - Max Notify rebuild new retry test DLddddGO
+name: CI Flask App - Max Notify rebuild new retry test DLddddGOdsq
 
 on:
   push:
