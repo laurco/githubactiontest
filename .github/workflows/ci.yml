@@ -1,4 +1,4 @@
-name: CI Flask App - Jobs Séparés (SANS CONFLIT)
+name: CI Flask App - Jobs Séparés (SANS CONFLIT) nouvelle CI
 
 on:
   push:
