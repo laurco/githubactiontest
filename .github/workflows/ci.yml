@@ -195,6 +195,7 @@ jobs:
             exit 1
           fi
 
+
           echo "Artefact trouvé → ID: $ARTIFACT_ID"
 
           # 2. Récupère l'URL de téléchargement
