@@ -163,7 +163,9 @@ jobs:
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           STATUS=$([ "${{ steps.build.outcome }}" = "success" ] && echo "END" || echo "FAILED")
-          ARTIFACT_URL="https://github.com/$REPO/actions/runs/artifacts/$GITHUB_RUN_ID"
+          GITHUB_RUN_ID=${{github.run_id}}
+          ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[0].id')
+          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID"
           PAYLOAD=$(jq -n \
             --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
             --arg step "Build Binary" --arg status "$STATUS" \
