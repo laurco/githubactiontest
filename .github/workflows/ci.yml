@@ -118,7 +118,7 @@ jobs:
           curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
-  # === 2. BUILD BINARY ===
+  # === 2. BUILD BINARY (Linux) ===
   build-binary:
     needs: ci
     if: success()
@@ -132,46 +132,80 @@ jobs:
         with:
           python-version: '3.11'
 
+      # === NOTIFY STEP START ===
       - name: Notify Step Start - Build Binary
         run: |
           START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
+            --arg repo "$REPO" --arg ref "$REF" \
             --arg step "Build Binary" --arg status "START" --arg start_time "$START_TIME" \
-            '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
+            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
 
+      # === INSTALL PYINSTALLER ===
       - name: Install PyInstaller
-        run: pip install pyinstaller
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller
 
+      # === BUILD + ZIP ===
       - name: Build Binary
         id: build
         run: |
           pyinstaller --onefile --name FlaskApp-Linux app.py
           chmod +x dist/FlaskApp-Linux
-          zip FlaskApp-Linux.zip dist/FlaskApp-Linux
+          zip FlaskApp-Linux-${{ github.run_number }}.zip dist/FlaskApp-Linux
 
+      # === UPLOAD ARTEFACT (nom unique) ===
       - name: Upload Binary Artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: FlaskApp-Linux
-          path: FlaskApp-Linux.zip
+          name: FlaskApp-Linux-${{ github.run_number }}
+          path: FlaskApp-Linux-${{ github.run_number }}.zip
 
+      # === RÉCUPÉRER L'URL API DE TÉLÉCHARGEMENT ===
+      - name: Get Artifact Download URL
+        id: artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_NAME="FlaskApp-Linux-${{ github.run_number }}"
+          ARTIFACT_ID=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id")
+
+          DOWNLOAD_URL=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
+            --jq '.archive_download_url')
+
+          echo "artifact_id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+
+      # === NOTIFY STEP END (avec URL API) ===
       - name: Notify Step End - Build Binary
         if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           STATUS=$([ "${{ steps.build.outcome }}" = "success" ] && echo "END" || echo "FAILED")
-          GITHUB_RUN_ID=${{github.run_id}}
-          ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[0].id')
-          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID"
+          ARTIFACT_URL="${{ steps.artifact.outputs.download_url }}"
+
           PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
+            --arg repo "$REPO" --arg ref "$REF" \
             --arg step "Build Binary" --arg status "$STATUS" \
             --arg end_time "$END_TIME" --arg artifact_url "$ARTIFACT_URL" \
-            '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
+            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
+          
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
