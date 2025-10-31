@@ -1,4 +1,4 @@
-name: CI Flask App - Max Notify rebuild new retry test DLddddGOdsqdsq
+name: CI Flask App - Max Notify (Détaillé Steps)
 
 on:
   push:
@@ -13,27 +13,34 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # === 1. CI ===
+  # === 1. CI (Étapes Détaillées) ===
   ci:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      # === PHASE 1: CHECKOUT ===
+      - name: Checkout code (Phase 1/7)
         uses: actions/checkout@v4
+        # Visible dans GUI: Logs du clone du repo
 
-      - name: Set up Python
+      # === PHASE 2: SETUP PYTHON ===
+      - name: Set up Python (Phase 2/7)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+        # Visible: Installation Python + cache pip
 
-      - name: Create requirements.txt
+      # === PHASE 3: CRÉER REQUIREMENTS ===
+      - name: Create requirements.txt (Phase 3/7)
         run: |
           cat > requirements.txt << EOF
           Flask==3.0.3
           pytest==8.3.3
           PyInstaller==6.10.0
           EOF
+        # Visible: Contenu du fichier généré
 
-      - name: Notify Pipeline Start
+      # === NOTIFICATION: PIPELINE START ===
+      - name: Notify Pipeline Start (Notification 1/5)
         run: |
           START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
@@ -41,10 +48,14 @@ jobs:
             --arg status "START" --arg start_time "$START_TIME" \
             '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
+        # Visible: Logs du curl (payload + signature)
 
-      - name: Notify Step Start - Install deps
+      # === PHASE 4: INSTALL DEPS ===
+      - name: Notify Step Start - Install deps (Notification 2/5)
         run: |
           START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
@@ -52,16 +63,19 @@ jobs:
             --arg step "Install deps" --arg status "START" --arg start_time "$START_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
 
-      - name: Install Dependencies
+      - name: Install Dependencies (Phase 4/7)
         id: install
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+        # Visible: Logs pip (packages installés, temps)
 
-      - name: Notify Step End - Install deps
+      - name: Notify Step End - Install deps (Notification 3/5)
         if: always()
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -71,10 +85,13 @@ jobs:
             --arg step "Install deps" --arg status "$STATUS" --arg end_time "$END_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, end_time:$end_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
 
-      - name: Notify Step Start - Run Tests
+      # === PHASE 5: RUN TESTS ===
+      - name: Notify Step Start - Run Tests (Notification 4/5)
         run: |
           START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
@@ -82,15 +99,19 @@ jobs:
             --arg step "Run Tests" --arg status "START" --arg start_time "$START_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
 
-      - name: Run Tests
+      - name: Run Tests (Phase 5/7)
         id: tests
         continue-on-error: true
-        run: pytest test_app.py -v || echo "Tests failed or not found"
+        run: |
+          pytest test_app.py -v || echo "Tests failed or not found"
+        # Visible: Output pytest (tests passés/échoués)
 
-      - name: Notify Step End - Run Tests
+      - name: Notify Step End - Run Tests (Notification 5/5)
         if: always()
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -100,81 +121,35 @@ jobs:
             --arg step "Run Tests" --arg status "$STATUS" --arg end_time "$END_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, end_time:$end_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
-
-      - name: Notify Pipeline End
-        if: always()
-        run: |
-          END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          STATUS=$([ "${{ job.status }}" = "success" ] && echo "END" || echo "FAILED")
-          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
-          PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
-            --arg status "$STATUS" --arg end_time "$END_TIME" \
-            --arg artifact_url "$ARTIFACT_URL" \
-            '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
-
-  # === 2. BUILD BINARY (Linux) ===
-  build-binary:
-    needs: ci
-    if: success()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # === NOTIFY STEP START ===
-      - name: Notify Step Start - Build Binary
-        run: |
-          START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" \
-            --arg step "Build Binary" --arg status "START" --arg start_time "$START_TIME" \
-            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, start_time:$start_time}')
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
           curl -s -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
             -d "$PAYLOAD"
 
-      # === INSTALL PYINSTALLER ===
-      - name: Install PyInstaller
+      # === PHASE 6: ARCHIVE ===
+      - name: Archive CI Results (Phase 6/7)
+        if: always()
         run: |
-          pip install --upgrade pip
-          pip install pyinstaller
+          zip -r ci-results-${{ github.run_number }}.zip . -x "*.git*"
+        # Visible: Contenu du ZIP (fichiers inclus)
 
-      # === BUILD + ZIP ===
-      - name: Build Binary
-        id: build
-        run: |
-          pyinstaller --onefile --name FlaskApp-Linux app.py
-          chmod +x dist/FlaskApp-Linux
-          zip FlaskApp-Linux-${{ github.run_number }}.zip dist/FlaskApp-Linux
-
-      # === UPLOAD ARTEFACT (nom unique) ===
-      - name: Upload Binary Artifact
+      # === PHASE 7: UPLOAD + NOTIFY END ===
+      - name: Upload CI Artifact (Phase 7/7)
         id: upload
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FlaskApp-Linux-${{ github.run_number }}
-          path: FlaskApp-Linux-${{ github.run_number }}.zip
+          name: ci-results-${{ github.run_number }}
+          path: ci-results-${{ github.run_number }}.zip
+        # Visible: Taille du ZIP uploadé
 
-      # === RÉCUPÉRER L'URL API DE TÉLÉCHARGEMENT ===
-      - name: Get Artifact Download URL
+      - name: Get CI Artifact Download URL
         id: artifact
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ARTIFACT_NAME="FlaskApp-Linux-${{ github.run_number }}"
+          ARTIFACT_NAME="ci-results-${{ github.run_number }}"
           ARTIFACT_ID=$(gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" \
@@ -187,25 +162,26 @@ jobs:
 
           echo "artifact_id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+        # Visible: Logs `gh api` (ID + URL)
 
-      # === NOTIFY STEP END (avec URL API) ===
-      - name: Notify Step End - Build Binary
+      - name: Notify Pipeline End (Artefact envoyé ici)
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          STATUS=$([ "${{ steps.build.outcome }}" = "success" ] && echo "END" || echo "FAILED")
+          STATUS=$([ "${{ job.status }}" = "success" ] && echo "END" || echo "FAILED")
           ARTIFACT_URL="${{ steps.artifact.outputs.download_url }}"
 
           PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" \
-            --arg step "Build Binary" --arg status "$STATUS" \
-            --arg end_time "$END_TIME" --arg artifact_url "$ARTIFACT_URL" \
-            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
+            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
+            --arg status "$STATUS" --arg end_time "$END_TIME" \
+            --arg artifact_url "$ARTIFACT_URL" \
+            '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
           
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
           curl -s -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
             -d "$PAYLOAD"
+        # Visible: Payload envoyé (avec artefact URL)
