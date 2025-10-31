@@ -1,4 +1,4 @@
-name: CI Flask App - Jobs Séparés (UI GitHub)
+name: CI Flask App - Jobs Séparés (SANS CONFLIT)
 
 on:
   push:
@@ -13,21 +13,21 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # === JOB 1: CHECKOUT + UPLOAD CODE ===
+  # === JOB 1: CHECKOUT + UPLOAD CODE (UNE SEULE FOIS) ===
   ci-checkout:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Upload source code
+      - name: Upload source code (UNE FOIS)
         uses: actions/upload-artifact@v4
         with:
           name: source-code
           path: .
           retention-days: 1
 
-  # === JOB 2: SETUP PYTHON ===
+  # === JOB 2: SETUP PYTHON (download only) ===
   ci-setup-python:
     needs: ci-checkout
     runs-on: ubuntu-latest
@@ -42,13 +42,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Upload source code (pass to next)
-        uses: actions/upload-artifact@v4
-        with:
-          name: source-code
-          path: .
-          retention-days: 1
 
   # === JOB 3: INSTALL DEPS ===
   ci-install-deps:
@@ -77,10 +70,8 @@ jobs:
             --arg step "Install deps" --arg status "START" --arg start_time "$START_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
       - name: Install Dependencies
         id: install
@@ -98,10 +89,8 @@ jobs:
             --arg step "Install deps" --arg status "$STATUS" --arg end_time "$END_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, end_time:$end_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
   # === JOB 4: RUN TESTS ===
   ci-run-tests:
@@ -122,10 +111,8 @@ jobs:
             --arg step "Run Tests" --arg status "START" --arg start_time "$START_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
       - name: Run Tests
         id: tests
@@ -143,10 +130,8 @@ jobs:
             --arg step "Run Tests" --arg status "$STATUS" --arg end_time "$END_TIME" \
             '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, end_time:$end_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
   # === JOB 5: ARCHIVE & UPLOAD CI RESULTS ===
   ci-archive-upload:
@@ -188,12 +173,12 @@ jobs:
             --jq '.archive_download_url')
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
-  # === JOB 6: NOTIFY PIPELINE END (Artefact envoyé ici) ===
+  # === JOB 6: NOTIFY PIPELINE END ===
   ci-notify-end:
     needs: ci-archive-upload
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Pipeline Start (début global)
+      - name: Notify Pipeline Start
         run: |
           START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
@@ -201,10 +186,8 @@ jobs:
             --arg status "START" --arg start_time "$START_TIME" \
             '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
       - name: Notify Pipeline End
         if: always()
@@ -219,12 +202,10 @@ jobs:
             --arg artifact_url "$ARTIFACT_URL" \
             '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
-  # === JOB 7: BUILD BINARY (optionnel) ===
+  # === JOB 7: BUILD BINARY ===
   build-binary:
     needs: ci-notify-end
     if: needs.ci-notify-end.result == 'success'
@@ -244,10 +225,8 @@ jobs:
             --arg step "Build Binary" --arg status "START" --arg start_time "$START_TIME" \
             '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, start_time:$start_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
       - name: Build Binary
         run: |
@@ -270,7 +249,5 @@ jobs:
             --arg step "Build Binary" --arg status "END" --arg end_time "$END_TIME" \
             '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
-            -d "$PAYLOAD"
+          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
