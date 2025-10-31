@@ -237,4 +237,3 @@ jobs:
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
           curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
-
