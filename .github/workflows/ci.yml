@@ -275,13 +275,44 @@ jobs:
           name: FlaskApp-Linux-${{ github.run_number }}
           path: FlaskApp-Linux-${{ github.run_number }}.zip
 
+      - name: Get Artifact Download URL
+        id: artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          ARTIFACT_NAME="FlaskApp-Linux-${{ github.run_number }}"
+          
+          # 1. Récupère l'ID de l'artefact
+          ARTIFACT_ID=$(curl -s \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            | jq -r ".artifacts[] | select(.name==\"$ARTIFACT_NAME\") | .id")
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "❌ Artefact '$ARTIFACT_NAME' non trouvé"
+            exit 1
+          fi
+
+          # 2. Récupère l'URL de téléchargement API
+          DOWNLOAD_URL="https://api.github.com/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip"
+
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "✅ URL API: $DOWNLOAD_URL"
+
       - name: Notify Step End - Build Binary
+        env:
+          WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
+          NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}
+          DOWNLOAD_URL: ${{ steps.artifact.outputs.download_url }}
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" \
-            --arg step "Build Binary" --arg status "END" --arg end_time "$END_TIME" \
-            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time}')
+            --arg repo "$REPO" --arg ref "$REF" --arg step "Build Binary" --arg status "END" \
+            --arg end_time "$END_TIME" --arg artifact_url "$DOWNLOAD_URL" \
+            '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
           SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
           curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
