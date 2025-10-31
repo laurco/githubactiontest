@@ -180,7 +180,7 @@ jobs:
             "/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" \
             --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id")
 
-          DOWNLOAD_URL=$(gh api \
+          DOWNLOAD_URL=$(gh api \ 
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
             --jq '.archive_download_url')
