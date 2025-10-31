@@ -162,15 +162,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Installe GitHub CLI
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+
+          # Récupère l'ID de l'artefact
           ARTIFACT_NAME="ci-results-${{ github.run_number }}"
           ARTIFACT_ID=$(gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" \
             --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id")
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "ERREUR: Artefact '$ARTIFACT_NAME' non trouvé"
+            exit 1
+          fi
+
+          # Récupère l'URL de téléchargement
           DOWNLOAD_URL=$(gh api \
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
             --jq '.archive_download_url')
+
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
   # === JOB 6: NOTIFY PIPELINE END ===
