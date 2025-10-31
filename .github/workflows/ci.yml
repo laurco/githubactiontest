@@ -194,6 +194,7 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ URL API: $DOWNLOAD_URL"
 
+
       - name: Notify Step End - Build Binary
         env:
             WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
