@@ -122,7 +122,7 @@ jobs:
             branch = "$env:REF"
             start_time = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " UTC"
           } | ConvertTo-Json -Compress
-          $signature = & openssl dgst -sha256 -hmac "$env:NGROK_SECRET" -binary <<< $payload | & openssl dgst -sha256 -hex | ForEach-Object { $_.Split("=")[1].Trim() }
+          $signature = & openssl dgst -sha256 -hmac "$env:NGROK_SECRET" -binary << $payload | & openssl dgst -sha256 -hex | ForEach-Object { $_.Split("=")[1].Trim() }
           Write-Host "Sending EXE BUILD START..."
           curl -v -X POST "$env:WEBHOOK_URL" `
             -H "Content-Type: application/json" `
