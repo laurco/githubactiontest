@@ -163,7 +163,7 @@ jobs:
         run: |
           END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           STATUS=$([ "${{ steps.build.outcome }}" = "success" ] && echo "END" || echo "FAILED")
-          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+          ARTIFACT_URL="https://github.com/$REPO/actions/runs/artifacts/$GITHUB_RUN_ID"
           PAYLOAD=$(jq -n \
             --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
             --arg step "Build Binary" --arg status "$STATUS" \
