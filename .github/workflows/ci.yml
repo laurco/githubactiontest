@@ -1,4 +1,4 @@
-name: CI Flask App - Max Notify
+name: CI Flask App - Max Notify rebuild
 
 on:
   push:
