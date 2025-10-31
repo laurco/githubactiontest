@@ -171,42 +171,44 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" | jq .
 
-      - name: Get Artifact Download URL (curl)
+      - name: Get Artifact Download URL
         id: artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          ARTIFACT_NAME="ci-results-${{ github.run_number }}"
-
-          echo "Recherche artefact: $ARTIFACT_NAME"
-
-          # 1. Récupère l'ID de l'artefact
+          ARTIFACT_NAME="FlaskApp-Linux-${{ github.run_number }}"
           ARTIFACT_ID=$(curl -s \
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" \
-            | jq -r ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .id")
+            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            | jq -r ".artifacts[] | select(.name==\"$ARTIFACT_NAME\") | .id")
 
           if [ -z "$ARTIFACT_ID" ]; then
-            echo "ERREUR: Artefact '$ARTIFACT_NAME' non trouvé"
-            curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/$REPO/actions/runs/$GITHUB_RUN_ID/artifacts" | jq .
+            echo "❌ Artefact '$ARTIFACT_NAME' non trouvé"
             exit 1
           fi
 
-
-          echo "Artefact trouvé → ID: $ARTIFACT_ID"
-
-          # 2. Récupère l'URL de téléchargement
-          DOWNLOAD_URL=$(curl -s \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" \
-            | jq -r '.archive_download_url')
-
-          echo "URL API: $DOWNLOAD_URL"
+          DOWNLOAD_URL="https://api.github.com/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip"
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "✅ URL API: $DOWNLOAD_URL"
+
+      - name: Notify Step End - Build Binary
+        env:
+            WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
+            NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}
+        run: |
+            END_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+            DOWNLOAD_URL="${{ steps.artifact.outputs.download_url }}"  # <- step ID correct
+            PAYLOAD=$(jq -n \
+              --arg repo "$REPO" --arg ref "$REF" --arg step "Build Binary" --arg status "END" \
+              --arg end_time "$END_TIME" --arg artifact_url "$DOWNLOAD_URL" \
+              '{type:"step", repo:$repo, branch:$ref, step:$step, status:$status, end_time:$end_time, artifact_url:$artifact_url}')
+            SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+            curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
+              -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
+
   # === JOB 6: NOTIFY PIPELINE END ===
   ci-notify-end:
     needs: ci-archive-upload
