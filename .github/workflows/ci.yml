@@ -104,80 +104,74 @@ jobs:
           curl -v -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
-  # === 2. BUILD EXE (Windows) ===
-  build-exe:
+  yaml# === 2. BUILD BINARY (Linux, universel) ===
+  build-binary:
     needs: ci
     if: success()
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # === NOTIFY EXE BUILD START ===
-      - name: Notify EXE Build Start
+      # === NOTIFY BINARY BUILD START ===
+      - name: Notify Binary Build Start
         run: |
-          $payload = @{
-            type = "exe_build_start"
-            repo = "$env:REPO"
-            branch = "$env:REF"
-            start_time = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " UTC"
-          } | ConvertTo-Json -Compress
-          $signature = & openssl dgst -sha256 -hmac "$env:NGROK_SECRET" -binary << $payload | & openssl dgst -sha256 -hex | ForEach-Object { $_.Split("=")[1].Trim() }
-          Write-Host "Sending EXE BUILD START..."
-          curl -v -X POST "$env:WEBHOOK_URL" `
-            -H "Content-Type: application/json" `
-            -H "X-Ngrok-Hmac-Signature: $signature" `
-            -d $payload
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg time "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
+            '{type:"binary_build_start", repo:$repo, branch:$ref, start_time:$time}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          curl -v -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install PyInstaller + deps
+      - name: Install Nuitka
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install nuitka
 
-      - name: Build EXE with PyInstaller
+      - name: Build Binary with Nuitka
         id: build
-        continue-on-error: true
         run: |
-          pyinstaller --onefile --name "FlaskApp" app.py
-          if ($LASTEXITCODE -eq 0) { echo "EXE built successfully" } else { echo "Build failed"; exit 1 }
+          python -m nuitka --onefile --enable-plugin=no-deploy app.py
+          mv app.bin FlaskApp-Linux
+          chmod +x FlaskApp-Linux
 
-      - name: Package EXE
+      - name: Package Binary
         if: steps.build.outcome == 'success'
         run: |
-          mkdir release
-          Copy-Item dist/FlaskApp.exe release/
-          Copy-Item requirements.txt release/  # optionnel
-          Compress-Archive -Path release/* -DestinationPath FlaskApp-Windows.zip
+          zip FlaskApp-Linux.zip FlaskApp-Linux
 
-      - name: Upload EXE Artifact
+      - name: Upload Binary Artifact
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: FlaskApp-Windows-EXE
-          path: FlaskApp-Windows.zip
+          name: FlaskApp-Linux-Binary
+          path: FlaskApp-Linux.zip
 
-      # === NOTIFY EXE BUILD END ===
-      - name: Notify EXE Build End
+      # === NOTIFY BINARY BUILD END ===
+      - name: Notify Binary Build End
         if: always()
         run: |
-          $status = if ("${{ steps.build.outcome }}" -eq "success") { "Successful" } else { "Failed" }
-          $artifact = if ($status -eq "Successful") { "https://github.com/$env:REPO/actions/runs/$env:GITHUB_RUN_ID" } else { "" }
-          $payload = @{
-            type = "exe_build_end"
-            repo = "$env:REPO"
-            branch = "$env:REF"
-            end_time = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " UTC"
-            status = $status
-            artifact_url = $artifact
-          } | ConvertTo-Json -Compress
-          $signature = & openssl dgst -sha256 -hmac "$env:NGROK_SECRET" -binary <<< $payload | & openssl dgst -sha256 -hex | ForEach-Object { $_.Split("=")[1].Trim() }
-          curl -v -X POST "$env:WEBHOOK_URL" `
-            -H "Content-Type: application/json" `
-            -H "X-Ngrok-Hmac-Signature: $signature" `
-            -d $payload
+          STATUS=$([ "${{ steps.build.outcome }}" = "success" ] && echo "Successful" || echo "Failed")
+          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID"
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg ref "$REF" \
+            --arg time "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" \
+            --arg url "$ARTIFACT_URL" \
+            --arg status "$STATUS" \
+            '{type:"binary_build_end", repo:$repo, branch:$ref, end_time:$time, artifact_url:$url, status:$status}')
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
+          curl -v -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
+            -d "$PAYLOAD"
