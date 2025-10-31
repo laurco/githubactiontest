@@ -111,7 +111,7 @@ jobs:
           curl -v -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
 
-  # === 2. BUILD BINARY (Linux, universel) ===
+  # === 2. BUILD BINARY WITH PYINSTALLER (Linux) ===
   build-binary:
     needs: ci
     if: success()
@@ -146,23 +146,21 @@ jobs:
             -H "X-Ngrok-Hmac-Signature: $SIGNATURE" \
             -d "$PAYLOAD"
 
-      - name: Install Nuitka + deps
+      - name: Install PyInstaller + deps
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka
 
-      - name: Build Binary with Nuitka
+      - name: Build Binary with PyInstaller
         id: build
         run: |
-          python -m nuitka --onefile --output-dir=dist app.py
-          mv dist/app FlaskApp-Linux
-          chmod +x FlaskApp-Linux
+          pyinstaller --onefile --name FlaskApp-Linux app.py
+          chmod +x dist/FlaskApp-Linux
 
       - name: Package Binary
         if: steps.build.outcome == 'success'
         run: |
-          zip FlaskApp-Linux.zip FlaskApp-Linux
+          zip FlaskApp-Linux.zip dist/FlaskApp-Linux
 
       - name: Upload Binary Artifact
         if: steps.build.outcome == 'success'
