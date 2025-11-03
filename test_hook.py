@@ -34,10 +34,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
         else:
             print(f"Événement {event} reçu :", body.decode())
 
+
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"OK")
-        
+
         
 httpd = HTTPServer(('0.0.0.0', PORT), WebhookHandler)
 print(f"Listening on port {PORT}")
