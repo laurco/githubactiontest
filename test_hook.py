@@ -39,7 +39,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
         
-        
 httpd = HTTPServer(('0.0.0.0', PORT), WebhookHandler)
 print(f"Listening on port {PORT}")
 httpd.serve_forever()
