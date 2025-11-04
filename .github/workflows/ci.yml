@@ -125,3 +125,4 @@ jobs:
           URL="https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts"
           DOWNLOAD_URL=$(curl -s -H "Authorization: token $GH_TOKEN" "$URL" | jq -r '.artifacts[] | select(.name == "FlaskApp-Linux-${{ github.run_number }}") | .archive_download_url')
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          
