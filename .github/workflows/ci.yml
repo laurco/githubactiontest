@@ -1,16 +1,8 @@
-name: CI Flask App - Jobs Séparés (SANS CONFLIT)
+name: CI & Build
 
 on:
   push:
     branches: [ main ]
-
-env:
-  REPO: ${{ github.repository }}
-  REF: ${{ github.ref }}
-  COMMIT: ${{ github.sha }}
-  WEBHOOK_URL: https://karri-fruity-wrongfully.ngrok-free.dev/webhook
-  NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   # === JOB 1: CHECKOUT + UPLOAD CODE ===
@@ -54,23 +46,10 @@ jobs:
           pytest==8.3.3
           PyInstaller==6.10.0
           EOF
-      - name: Notify Start - Install deps
-        run: |
-          START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
-            --arg step "Install deps" --arg status "START" --arg start_time "$START_TIME" \
-            '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
       - name: Install Dependencies
-        id: install
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Notify End - Install deps
-        if: always()
 
   # === JOB 4: RUN TESTS ===
   ci-run-tests:
@@ -81,22 +60,10 @@ jobs:
         with:
           name: source-code
           path: .
-      - name: Notify Start - Run Tests
-        run: |
-          START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          PAYLOAD=$(jq -n \
-            --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
-            --arg step "Run Tests" --arg status "START" --arg start_time "$START_TIME" \
-            '{type:"step", repo:$repo, branch:$ref, commit:$commit, step:$step, status:$status, start_time:$start_time}')
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
       - name: Run Tests
         id: tests
         continue-on-error: true
         run: pytest test_app.py -v || echo "Tests failed or not found"
-      - name: Notify End - Run Tests
-        if: always()
 
   # === JOB 5: ARCHIVE & UPLOAD CI RESULTS ===
   ci-archive-upload:
@@ -123,37 +90,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
-      
-
-  # === JOB 6: NOTIFY PIPELINE END ===
-  ci-notify-end:
-    needs: ci-archive-upload
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Pipeline Start
         run: |
-          START_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          PAYLOAD=$(jq -n --arg repo "$REPO" --arg ref "$REF" --arg commit "$COMMIT" \
-            --arg status "START" --arg start_time "$START_TIME" \
-            '{type:"pipeline", repo:$repo, branch:$ref, commit:$commit, status:$status, start_time:$start_time}')
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$NGROK_SECRET" | awk '{print $2}')
-          curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" \
-            -H "X-Ngrok-Hmac-Signature: $SIGNATURE" -d "$PAYLOAD"
-      - name: Notify Pipeline End
-        if: always()
-        env:
-          ARTIFACT_URL: ${{ needs.ci-archive-upload.outputs.download_url }}
+          URL="https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts"
+          DOWNLOAD_URL=$(curl -s -H "Authorization: token $GH_TOKEN" "$URL" | jq -r '.artifacts[] | select(.name == "ci-results-${{ github.run_number }}") | .archive_download_url')
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
-  # === JOB 7: BUILD BINARY ===
+  # === JOB 6: BUILD BINARY ===
   build-binary:
-    needs: ci-notify-end
+    needs: ci-archive-upload
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: source-code
           path: .
-      
       - name: Build Binary
         run: |
           pip install pyinstaller
@@ -165,16 +115,13 @@ jobs:
         with:
           name: FlaskApp-Linux-${{ github.run_number }}
           path: FlaskApp-Linux-${{ github.run_number }}.zip
-      - name: Get Artifact Download URL
+      - name: Get Binary Download URL
         id: artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
-     
-      - name: Notify End - Build Binary
-        env:
-          WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
-          NGROK_SECRET: ${{ secrets.DEPLOY_ROBOT_SECRET }}
-          DOWNLOAD_URL: ${{ steps.artifact.outputs.download_url }}
-    
+        run: |
+          URL="https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts"
+          DOWNLOAD_URL=$(curl -s -H "Authorization: token $GH_TOKEN" "$URL" | jq -r '.artifacts[] | select(.name == "FlaskApp-Linux-${{ github.run_number }}") | .archive_download_url')
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
