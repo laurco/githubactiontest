@@ -153,7 +153,6 @@ jobs:
           DOWNLOAD_URL="https://api.github.com/repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip"
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
-
   # === JOB 6: NOTIFY PIPELINE END ===
   ci-notify-end:
     needs: ci-archive-upload
